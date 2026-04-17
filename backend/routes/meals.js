@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const router = express.Router();
-const authenticate = require('./profile').authenticate; // или вынесите в middleware.js
+const authenticate = require('../middlewares/authenticate');
 
 // Добавить приём пищи (FR-301, FR-304, FR-306)
 router.post('/add', authenticate, async (req, res) => {

@@ -1,18 +1,7 @@
 const express = require('express');
 const pool = require('../db');
+const authenticate = require('../middlewares/authenticate');
 const router = express.Router();
-
-// Middleware для проверки JWT
-const authenticate = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Нет токена' });
-  try {
-    req.user = require('jsonwebtoken').verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.status(403).json({ error: 'Невалидный токен' });
-  }
-};
 
 // Получить профиль (FR-201, FR-202, FR-204, FR-205)
 router.get('/', authenticate, async (req, res) => {
