@@ -1,5 +1,6 @@
 // CTA.tsx
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export const CTA: React.FC = () => {
   return (
@@ -40,7 +41,8 @@ export const CTA: React.FC = () => {
             ></div>
 
             {/* Кнопка */}
-            <button
+            <Link
+              to="/register"
               className="relative px-12 py-4 bg-purple-500 text-white font-bold text-xl rounded-lg 
                        transition-all duration-300 transform 
                        group-hover:-translate-y-1 group-hover:scale-105
@@ -73,7 +75,7 @@ export const CTA: React.FC = () => {
                   />
                 </svg>
               </span>
-            </button>
+            </Link>
           </div>
         </div>
       </div>

@@ -3,23 +3,22 @@ const bcrypt = require('bcrypt');
 const pool = require('../db');
 const authenticate = require('../middlewares/authenticate');
 const { serializeCookie } = require('../utils/cookies');
-const { createSession, deleteSession, SESSION_TTL_MS } = require('../services/sessionStore');
+const { createSession, deleteSession, SESSION_TTL_MS, SHORT_SESSION_TTL_MS } = require('../services/sessionStore');
 const { normalizeEmail, validateCredentials } = require('../utils/authValidation');
 const { isBlocked, registerFailure, clearAttempts, WINDOW_MS, MAX_ATTEMPTS } = require('../services/loginAttempts');
 
 const router = express.Router();
 const INVALID_CREDENTIALS_MESSAGE = 'Неверные учетные данные';
-const COOKIE_MAX_AGE_SECONDS = Math.floor(SESSION_TTL_MS / 1000);
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-function attachSessionCookie(res, sessionId) {
+function attachSessionCookie(res, sessionId, ttlMs) {
   res.setHeader(
     'Set-Cookie',
     serializeCookie('session_id', sessionId, {
       httpOnly: true,
       sameSite: 'Lax',
       path: '/',
-      maxAge: COOKIE_MAX_AGE_SECONDS,
+      maxAge: Math.floor(ttlMs / 1000),
       secure: IS_PRODUCTION,
     }),
   );
@@ -57,8 +56,8 @@ router.post('/register', async (req, res, next) => {
       [validation.email, passwordHash],
     );
     const user = result.rows[0];
-    const session = createSession(user.id);
-    attachSessionCookie(res, session.sessionId);
+    const session = createSession(user.id, { ttlMs: SESSION_TTL_MS });
+    attachSessionCookie(res, session.sessionId, SESSION_TTL_MS);
     return res.status(201).json({ message: 'Регистрация успешна', user });
   } catch (error) {
     return next(error);
@@ -69,6 +68,8 @@ router.post('/login', async (req, res, next) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || '');
+    const rememberMe = Boolean(req.body?.rememberMe);
+    const ttlMs = rememberMe ? SESSION_TTL_MS : SHORT_SESSION_TTL_MS;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email и пароль обязательны' });
@@ -98,8 +99,8 @@ router.post('/login', async (req, res, next) => {
     }
 
     clearAttempts(email, req.ip);
-    const session = createSession(user.id);
-    attachSessionCookie(res, session.sessionId);
+    const session = createSession(user.id, { ttlMs });
+    attachSessionCookie(res, session.sessionId, ttlMs);
     return res.json({ user: { id: user.id, email: user.email } });
   } catch (error) {
     return next(error);
