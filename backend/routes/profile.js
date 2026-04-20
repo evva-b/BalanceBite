@@ -131,4 +131,118 @@ router.put('/', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * @route GET /api/profile/bmi
+ * @description Рассчитать ИМТ текущего пользователя
+ * @access Private (требуется авторизация)
+ */
+router.get('/bmi', authenticate, async (req, res) => {
+  try {
+    // Получаем профиль из БД
+    const profileResult = await pool.query(
+      'SELECT height_cm, weight_kg FROM profiles WHERE user_id = $1',
+      [req.user.id],
+    );
+
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Профиль не найден',
+        details: ['Сначала создайте профиль с указанием роста и веса'],
+      });
+    }
+
+    const profile = profileResult.rows[0];
+
+    // Проверяем, есть ли данные
+    if (!profile.height_cm || !profile.weight_kg) {
+      return res.status(400).json({
+        success: false,
+        error: 'Недостаточно данных',
+        details: ['В профиле не указан рост или вес'],
+      });
+    }
+
+    // Рассчитываем ИМТ
+    const { calculateBMI } = require('../utils/bmiCalculator');
+    const bmiResult = calculateBMI(profile.weight_kg, profile.height_cm);
+
+    if (!bmiResult.success) {
+      return res.status(400).json(bmiResult);
+    }
+
+    res.json({
+      success: true,
+      message: 'ИМТ успешно рассчитан',
+      data: bmiResult.data,
+      meta: {
+        calculatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/profile/bmi error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при расчёте ИМТ',
+    });
+  }
+});
+
+/**
+ * @route GET /api/profile/metrics
+ * @description Получить все метрики профиля (ИМТ, рост, вес, возраст)
+ * @access Private (требуется авторизация)
+ */
+router.get('/metrics', authenticate, async (req, res) => {
+  try {
+    // Получаем полный профиль
+    const profileResult = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [
+      req.user.id,
+    ]);
+
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Профиль не найден',
+        details: ['Профиль ещё не создан'],
+      });
+    }
+
+    const profile = profileResult.rows[0];
+    const metrics = {
+      height_cm: profile.height_cm,
+      weight_kg: profile.weight_kg,
+      age: profile.age,
+      gender: profile.gender,
+      goal: profile.goal,
+      daily_calorie_norm: profile.daily_calorie_norm,
+    };
+
+    // Если есть рост и вес, добавляем ИМТ
+    if (profile.height_cm && profile.weight_kg) {
+      const { calculateBMI } = require('../utils/bmiCalculator');
+      const bmiResult = calculateBMI(profile.weight_kg, profile.height_cm);
+
+      if (bmiResult.success) {
+        metrics.bmi = bmiResult.data.bmi;
+        metrics.bmiCategory = bmiResult.data.category;
+        metrics.bmiCategoryCode = bmiResult.data.categoryCode;
+        metrics.healthyWeightRange = bmiResult.data.healthyWeightRange;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Метрики успешно получены',
+      data: metrics,
+    });
+  } catch (err) {
+    console.error('GET /api/profile/metrics error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при получении метрик',
+    });
+  }
+});
+
 module.exports = router;
