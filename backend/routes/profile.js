@@ -245,4 +245,157 @@ router.get('/metrics', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * @route GET /api/profile/calories
+ * @description Рассчитать норму калорий текущего пользователя
+ * @access Private (требуется авторизация)
+ * @query {number} activityLevel - коэффициент активности (1.2, 1.375, 1.55, 1.725, 1.9)
+ */
+router.get('/calories', authenticate, async (req, res) => {
+  try {
+    // Получаем профиль из БД
+    const profileResult = await pool.query(
+      `SELECT gender, age, height_cm, weight_kg, goal, daily_calorie_norm 
+       FROM profiles 
+       WHERE user_id = $1`,
+      [req.user.id],
+    );
+
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Профиль не найден',
+        details: ['Сначала создайте профиль'],
+      });
+    }
+
+    const profile = profileResult.rows[0];
+
+    // Проверяем обязательные поля
+    const requiredFields = ['gender', 'age', 'height_cm', 'weight_kg', 'goal'];
+    const missingFields = requiredFields.filter((field) => !profile[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Недостаточно данных',
+        details: [`Заполните поля: ${missingFields.join(', ')}`],
+      });
+    }
+
+    // Получаем уровень активности из query params (по умолчанию 1.2)
+    const activityLevel = req.query.activityLevel ? parseFloat(req.query.activityLevel) : 1.2;
+
+    // Рассчитываем норму калорий
+    const { calculateCalorieNorm } = require('../utils/calorieCalculator');
+
+    const calorieResult = calculateCalorieNorm({
+      weightKg: profile.weight_kg,
+      heightCm: profile.height_cm,
+      age: profile.age,
+      gender: profile.gender,
+      goal: profile.goal,
+      activityLevel,
+    });
+
+    if (!calorieResult.success) {
+      return res.status(400).json(calorieResult);
+    }
+
+    // Добавляем рекомендации
+
+    // Добавляем сохранённое значение из БД для сравнения
+    calorieResult.data.storedNorm = profile.daily_calorie_norm
+      ? Number(profile.daily_calorie_norm)
+      : null;
+
+    res.json({
+      success: true,
+      message: 'Норма калорий успешно рассчитана',
+      data: calorieResult.data,
+      meta: {
+        calculatedAt: new Date().toISOString(),
+        activityLevelSource: req.query.activityLevel ? 'query_param' : 'default',
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/profile/calories error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при расчёте нормы калорий',
+    });
+  }
+});
+
+/**
+ * @route GET /api/profile/calories/breakdown
+ * @description Получить детальную расшифровку расчёта калорий
+ * @access Private
+ */
+router.get('/calories/breakdown', authenticate, async (req, res) => {
+  try {
+    const profileResult = await pool.query(
+      `SELECT gender, age, height_cm, weight_kg, goal 
+       FROM profiles 
+       WHERE user_id = $1`,
+      [req.user.id],
+    );
+
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Профиль не найден',
+      });
+    }
+
+    const profile = profileResult.rows[0];
+    const activityLevel = req.query.activityLevel ? parseFloat(req.query.activityLevel) : 1.2;
+
+    const { calculateCalorieNorm } = require('../utils/calorieCalculator');
+    const result = calculateCalorieNorm({
+      weightKg: profile.weight_kg,
+      heightCm: profile.height_cm,
+      age: profile.age,
+      gender: profile.gender,
+      goal: profile.goal,
+      activityLevel,
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json({
+      success: true,
+      message: 'Расшифровка расчёта',
+      data: {
+        userProfile: {
+          weight: profile.weight_kg,
+          height: profile.height_cm,
+          age: profile.age,
+          gender: profile.gender,
+          goal: profile.goal,
+        },
+        calculation: result.data.breakdown,
+        result: {
+          bmr: result.data.bmr,
+          tdee: result.data.tdee,
+          dailyNorm: result.data.dailyCalorieNorm,
+        },
+        explanation: {
+          bmr: 'BMR (Basal Metabolic Rate) — базовый обмен веществ: калории, необходимые для поддержания жизни в состоянии покоя',
+          tdee: 'TDEE (Total Daily Energy Expenditure) — общие суточные энергозатраты с учётом активности',
+          goal: `Цель "${profile.goal}" корректирует норму: ${result.data.goalMultiplier > 1 ? 'увеличение' : result.data.goalMultiplier < 1 ? 'снижение' : 'без изменений'}`,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/profile/calories/breakdown error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка при получении расшифровки',
+    });
+  }
+});
+
 module.exports = router;
