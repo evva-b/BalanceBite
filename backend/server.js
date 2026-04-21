@@ -31,3 +31,24 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Бэкенд запущен на http://localhost:${PORT}`));
+
+app.get('/api/profile/metrics', (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            height_cm: 175,
+            weight_kg: 70,
+            age: 25,
+            gender: 'male',
+            goal: 'Поддержание веса',
+            daily_calorie_norm: 2009,
+            bmi: 22.9,
+            bmiCategory: 'Норма',
+            healthyWeightRange: { min: 56.7, max: 76.3, unit: 'кг' },
+            bmr: 1674
+        }
+    });
+});
+app.use('/api/profile', require('./routes/profile'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/meals', require('./routes/meals'));
