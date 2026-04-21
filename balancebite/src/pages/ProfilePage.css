@@ -1,0 +1,207 @@
+/* ProfilePage.css */
+
+.profile-container {
+  position: relative;
+  width: 1200px;
+  height: 700px;
+  background: #FFFFE6;
+  font-family: 'Jost', sans-serif;
+}
+
+/* Верхняя панель */
+.top-nav {
+  position: absolute;
+  width: 1000px;
+  height: 37px;
+  left: 100px;
+  top: 43px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-links a {
+  font-size: 16px;
+  color: #22241E;
+  text-decoration: none;
+}
+
+.user-avatar {
+  width: 37px;
+  height: 37px;
+  background: #58B079;
+  border-radius: 50%;
+}
+
+/* Карточки */
+.metrics-card, .goal-card, .info-card, .allergies-card {
+  background: #FFFFFF;
+  border-radius: 15px;
+  padding: 15px;
+  position: absolute;
+}
+
+.metrics-card {
+  width: 425px;
+  height: 171px;
+  left: 100px;
+  top: 295px;
+}
+
+.goal-card {
+  width: 511px;
+  height: 171px;
+  left: 588px;
+  top: 295px;
+}
+
+.info-card {
+  width: 405px;
+  height: 142px;
+  left: 694px;
+  top: 124px;
+}
+
+.allergies-card {
+  width: 660px;
+  height: 171px;
+  left: 100px;
+  top: 486px;
+}
+
+/* Заголовки карточек */
+.metrics-card h3, .goal-card h3, .info-card h3, .allergies-card h3 {
+  color: #58B079;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+/* Поля ввода */
+.metric-input {
+  background: #F0F0F0;
+  border-radius: 15px;
+  border: none;
+  padding: 5px 10px;
+  width: 60px;
+  font-family: 'Jost', sans-serif;
+}
+
+/* Переключатель пола */
+.gender-toggle {
+  display: flex;
+  gap: 10px;
+}
+
+.gender-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 15px;
+  background: #F0F0F0;
+  border: none;
+  cursor: pointer;
+}
+
+.gender-btn.active {
+  background: #D974E6;
+  color: white;
+}
+
+/* Кнопки цели */
+.goal-buttons {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.goal-btn {
+  background: none;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 16px;
+  position: relative;
+}
+
+.goal-btn.active::before {
+  content: '●';
+  color: #D974E6;
+  position: absolute;
+  left: -15px;
+  top: 0;
+}
+
+/* Кнопка сохранения */
+.save-btn {
+  position: absolute;
+  width: 170px;
+  height: 31px;
+  left: 846px;
+  top: 559px;
+  background: #8CDF75;
+  border-radius: 20px;
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Сообщение об ошибке */
+.error-toast {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(199, 52, 52, 0.75);
+  border: 0.5px solid #6D0D0D;
+  border-radius: 10px;
+  padding: 5px 15px;
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  animation: fadeOut 3s forwards;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+/* Звездочки обязательных полей */
+.required-star {
+  color: #D974E6;
+  margin-left: 5px;
+}
+
+/* Ошибки полей */
+.field-error {
+  color: #C73434;
+  font-size: 12px;
+  margin-left: 10px;
+}
+
+.error-btn {
+  position: absolute;
+  width: 170px;
+  height: 31px;
+  left: 100px;
+  top: 669px;
+  background: linear-gradient(90deg, #22241E 0%, #32342D 100%);
+  border-radius: 20px;
+  border: none;
+  color: white;
+  cursor: pointer;
+}

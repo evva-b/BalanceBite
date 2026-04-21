@@ -6,6 +6,6 @@
 
 @layer base {
   body {
-    @apply font-jost;
+    font-family: 'Jost', sans-serif;
   }
 }
