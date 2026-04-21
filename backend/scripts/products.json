@@ -1,0 +1,130 @@
+[
+  {
+    "name": "Куриная грудка (вареная)",
+    "calories": 165,
+    "proteins": 31,
+    "fats": 3.6,
+    "carbs": 0,
+    "category": "Мясо"
+  },
+  {
+    "name": "Говядина (вареная)",
+    "calories": 260,
+    "proteins": 26,
+    "fats": 16,
+    "carbs": 0,
+    "category": "Мясо"
+  },
+  {
+    "name": "Яйцо куриное (1 шт)",
+    "calories": 75,
+    "proteins": 6,
+    "fats": 5,
+    "carbs": 0.6,
+    "category": "Молочные/Яйца"
+  },
+  {
+    "name": "Молоко 2.5%",
+    "calories": 54,
+    "proteins": 2.9,
+    "fats": 2.5,
+    "carbs": 4.8,
+    "category": "Молочные/Яйца"
+  },
+  {
+    "name": "Творог 5%",
+    "calories": 120,
+    "proteins": 17,
+    "fats": 5,
+    "carbs": 1.8,
+    "category": "Молочные/Яйца"
+  },
+  {
+    "name": "Рис белый (вареный)",
+    "calories": 130,
+    "proteins": 2.7,
+    "fats": 0.3,
+    "carbs": 28,
+    "category": "Крупы"
+  },
+  {
+    "name": "Гречка (вареная)",
+    "calories": 110,
+    "proteins": 4.5,
+    "fats": 1.2,
+    "carbs": 21,
+    "category": "Крупы"
+  },
+  {
+    "name": "Овсянка на воде",
+    "calories": 88,
+    "proteins": 3,
+    "fats": 1.7,
+    "carbs": 15,
+    "category": "Крупы"
+  },
+  {
+    "name": "Хлеб черный",
+    "calories": 210,
+    "proteins": 6.5,
+    "fats": 1.2,
+    "carbs": 40,
+    "category": "Хлеб"
+  },
+  {
+    "name": "Яблоко",
+    "calories": 52,
+    "proteins": 0.3,
+    "fats": 0.2,
+    "carbs": 14,
+    "category": "Фрукты"
+  },
+  {
+    "name": "Банан",
+    "calories": 89,
+    "proteins": 1.1,
+    "fats": 0.3,
+    "carbs": 23,
+    "category": "Фрукты"
+  },
+  {
+    "name": "Картофель (вареный)",
+    "calories": 87,
+    "proteins": 1.9,
+    "fats": 0.1,
+    "carbs": 20,
+    "category": "Овощи"
+  },
+  {
+    "name": "Огурец свежий",
+    "calories": 15,
+    "proteins": 0.7,
+    "fats": 0.1,
+    "carbs": 3.6,
+    "category": "Овощи"
+  },
+  {
+    "name": "Помидор",
+    "calories": 18,
+    "proteins": 0.9,
+    "fats": 0.2,
+    "carbs": 3.9,
+    "category": "Овощи"
+  },
+  {
+    "name": "Масло подсолнечное",
+    "calories": 884,
+    "proteins": 0,
+    "fats": 100,
+    "carbs": 0,
+    "category": "Масла"
+  },
+  {
+    "name": "Сыр Российский",
+    "calories": 364,
+    "proteins": 23,
+    "fats": 30,
+    "carbs": 0,
+    "category": "Молочные/Яйца"
+  }
+]
