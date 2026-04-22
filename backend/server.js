@@ -33,4 +33,7 @@ app.use((error, req, res, next) => {
 const diaryRoutes = require('./routes/diary');
 app.use('/api/diary', diaryRoutes);
 
+const analyticsRoutes = require('./routes/analytics');
+app.use('/api/analytics', analyticsRoutes);
+
 app.listen(PORT, () => console.log(`🚀 Бэкенд запущен на http://localhost:${PORT}`));

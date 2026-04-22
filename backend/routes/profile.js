@@ -243,7 +243,7 @@ router.put('/', authenticate, async (req, res) => {
       success: true,
       message: 'Профиль успешно обновлён',
       data: {
-        daily_calorie_norm,
+        daily_calorie_norm: daily_calorie_norm || null,
         calculated: daily_calorie_norm !== null,
       },
     });
