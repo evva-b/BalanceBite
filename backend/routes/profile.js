@@ -1,401 +1,271 @@
 const express = require('express');
 const pool = require('../db');
 const authenticate = require('../middlewares/authenticate');
+const { calculateCalorieNorm } = require('../utils/calorieCalculator');
 const router = express.Router();
 
-// Получить профиль
+// ============================================================================
+// GET /api/profile - Получить профиль
+// ============================================================================
 router.get('/', authenticate, async (req, res) => {
   try {
-    const profile = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [req.user.id]);
-    res.json(profile.rows[0] || {});
+    const userResult = await pool.query(
+      'SELECT id, email, phone, status FROM users WHERE id = $1',
+      [req.user.id],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    const user = userResult.rows[0];
+
+    const profileResult = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [
+      req.user.id,
+    ]);
+
+    const profile = profileResult.rows[0] || {};
+
+    // Нелюбимые продукты
+    const dislikedResult = await pool.query(
+      'SELECT product_name FROM user_disliked_products WHERE user_id = $1',
+      [req.user.id],
+    );
+    const dislikedProducts = dislikedResult.rows.map((r) => r.product_name);
+
+    // Любимые продукты
+    const favoritesResult = await pool.query(
+      `SELECT p.id, p.name, p.calories_kcal, p.proteins_g, p.fats_g, p.carbs_g
+       FROM favorite_products fp
+       JOIN products p ON fp.product_id = p.id
+       WHERE fp.user_id = $1`,
+      [req.user.id],
+    );
+
+    // ✅ ИСПРАВЛЕНО: добавлен ключ data: перед объектом
+    res.json({
+      success: true,
+      data: {
+        email: user.email,
+        phone: user.phone,
+        status: user.status,
+        gender: profile.gender,
+        age: profile.age,
+        height_cm: profile.height_cm,
+        weight_kg: profile.weight_kg,
+        goal: profile.goal,
+        activity_level: profile.activity_level,
+        daily_calorie_norm: profile.daily_calorie_norm,
+        dislikedProducts,
+        favoriteProducts: favoritesResult.rows,
+      },
+    });
   } catch (err) {
     console.error('GET /api/profile error:', err);
     res.status(500).json({ error: 'Ошибка загрузки профиля' });
   }
 });
 
-// Обновить профиль
+// ============================================================================
+// PUT /api/profile - Обновить профиль
+// ============================================================================
 router.put('/', authenticate, async (req, res) => {
+  const client = await pool.connect();
+
   try {
-    const { gender, age, height_cm, weight_kg, goal } = req.body;
+    const {
+      email,
+      phone,
+      status,
+      gender,
+      age,
+      height_cm,
+      weight_kg,
+      goal,
+      activity_level,
+      dislikedProducts,
+      favoriteProductIds,
+    } = req.body;
 
-    // 🔥 ВАЛИДАЦИЯ (FR-203)
-    const validationErrors = [];
+    await client.query('BEGIN');
 
-    if (height_cm !== undefined) {
-      const height = Number(height_cm);
-      if (isNaN(height)) validationErrors.push('Рост должен быть числом');
-      else if (height < 100 || height > 250)
-        validationErrors.push('Рост должен быть в диапазоне от 100 до 250 см');
-    }
-    if (weight_kg !== undefined) {
-      const weight = Number(weight_kg);
-      if (isNaN(weight)) validationErrors.push('Вес должен быть числом');
-      else if (weight < 30 || weight > 250)
-        validationErrors.push('Вес должен быть в диапазоне от 30 до 250 кг');
-    }
-    if (age !== undefined) {
-      const userAge = Number(age);
-      if (isNaN(userAge)) validationErrors.push('Возраст должен быть числом');
-      else if (userAge < 16 || userAge > 120)
-        validationErrors.push('Возраст должен быть в диапазоне от 16 до 120 лет');
-    }
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ error: 'Ошибка валидации данных', details: validationErrors });
-    }
-
-    // 🔥 Рассчитываем ИМТ (только для ответа)
-    let bmi = null;
-    let daily_calorie_norm = null;
-
-    if (height_cm != null && weight_kg != null && age != null) {
-      const hM = Number(height_cm) / 100;
-      const w = Number(weight_kg);
-      const a = Number(age);
-
-      bmi = w / (hM * hM);
-
-      let bmr = 10 * w + 6.25 * Number(height_cm) - 5 * a;
-      const userGender = req.user?.gender || gender;
-      bmr = userGender === 'female' ? bmr - 161 : bmr + 5;
-
-      const mult = goal === 'Снижение веса' ? 0.8 : goal === 'Набор массы' ? 1.15 : 1.0;
-      daily_calorie_norm = Math.round(bmr * 1.2 * mult);
-    }
-
-    // 🔥 Проверяем существование профиля
-    const existing = await pool.query('SELECT id FROM profiles WHERE user_id = $1', [req.user.id]);
-
-    if (existing.rows.length > 0) {
-      // UPDATE существующего профиля (БЕЗ created_at/updated_at!)
-      const fields = [];
-      const values = [];
+    // 1. Обновляем users
+    if (email !== undefined || phone !== undefined || status !== undefined) {
+      const userFields = [];
+      const userValues = [];
       let idx = 1;
 
-      if (gender !== undefined) {
-        fields.push(`gender = $${idx++}`);
-        values.push(gender);
+      if (email !== undefined) {
+        userFields.push(`email = $${idx++}`);
+        userValues.push(email);
       }
-      if (age !== undefined) {
-        fields.push(`age = $${idx++}`);
-        values.push(age);
+      if (phone !== undefined) {
+        userFields.push(`phone = $${idx++}`);
+        userValues.push(phone);
       }
-      if (height_cm !== undefined) {
-        fields.push(`height_cm = $${idx++}`);
-        values.push(height_cm);
-      }
-      if (weight_kg !== undefined) {
-        fields.push(`weight_kg = $${idx++}`);
-        values.push(weight_kg);
-      }
-      if (goal !== undefined) {
-        fields.push(`goal = $${idx++}`);
-        values.push(goal);
-      }
-      if (daily_calorie_norm !== null) {
-        fields.push(`daily_calorie_norm = $${idx++}`);
-        values.push(daily_calorie_norm);
+      if (status !== undefined) {
+        userFields.push(`status = $${idx++}`);
+        userValues.push(status);
       }
 
-      values.push(req.user.id);
+      if (userFields.length > 0) {
+        userValues.push(req.user.id);
+        await client.query(
+          `UPDATE users SET ${userFields.join(', ')} WHERE id = $${idx}`,
+          userValues,
+        );
+      }
+    }
 
-      await pool.query(`UPDATE profiles SET ${fields.join(', ')} WHERE user_id = $${idx}`, values);
-    } else {
-      // INSERT нового профиля (БЕЗ created_at/updated_at/bmi!)
-      await pool.query(
-        `INSERT INTO profiles (
-          user_id, gender, age, height_cm, weight_kg, goal, daily_calorie_norm
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
+    // 2. Обновляем/создаём profile
+    if (
+      gender !== undefined ||
+      age !== undefined ||
+      height_cm !== undefined ||
+      weight_kg !== undefined ||
+      goal !== undefined ||
+      activity_level !== undefined
+    ) {
+      const existing = await client.query('SELECT id FROM profiles WHERE user_id = $1', [
+        req.user.id,
+      ]);
+
+      // 🔥 Расчёт калорий с учётом уровня активности
+      let daily_calorie_norm = null;
+      if (height_cm && weight_kg && age && gender) {
+        const activityMultiplier = getActivityLevelMultiplier(activity_level);
+
+        const calorieCalc = calculateCalorieNorm({
+          weightKg: weight_kg,
+          heightCm: height_cm,
+          age: age,
+          gender: gender,
+          goal: goal || 'Поддержание веса',
+          activityLevel: activityMultiplier,
+        });
+
+        if (calorieCalc.success) {
+          daily_calorie_norm = calorieCalc.data.dailyCalorieNorm;
+        }
+      }
+
+      if (existing.rows.length > 0) {
+        // UPDATE
+        const profileFields = [];
+        const profileValues = [];
+        let pIdx = 1;
+
+        if (gender !== undefined) {
+          profileFields.push(`gender = $${pIdx++}`);
+          profileValues.push(gender);
+        }
+        if (age !== undefined) {
+          profileFields.push(`age = $${pIdx++}`);
+          profileValues.push(age);
+        }
+        if (height_cm !== undefined) {
+          profileFields.push(`height_cm = $${pIdx++}`);
+          profileValues.push(height_cm);
+        }
+        if (weight_kg !== undefined) {
+          profileFields.push(`weight_kg = $${pIdx++}`);
+          profileValues.push(weight_kg);
+        }
+        if (goal !== undefined) {
+          profileFields.push(`goal = $${pIdx++}`);
+          profileValues.push(goal);
+        }
+        if (activity_level !== undefined) {
+          profileFields.push(`activity_level = $${pIdx++}`);
+          profileValues.push(activity_level);
+        }
+        if (daily_calorie_norm !== null) {
+          profileFields.push(`daily_calorie_norm = $${pIdx++}`);
+          profileValues.push(daily_calorie_norm);
+        }
+
+        if (profileFields.length > 0) {
+          profileValues.push(req.user.id);
+          await client.query(
+            `UPDATE profiles SET ${profileFields.join(', ')} WHERE user_id = $${pIdx}`,
+            profileValues,
+          );
+        }
+      } else {
+        // INSERT
+        await client.query(
+          `INSERT INTO profiles (user_id, gender, age, height_cm, weight_kg, goal, activity_level, daily_calorie_norm)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            req.user.id,
+            gender || null,
+            age || null,
+            height_cm || null,
+            weight_kg || null,
+            goal || null,
+            activity_level || null,
+            daily_calorie_norm,
+          ],
+        );
+      }
+    }
+
+    // 3. Обновляем нелюбимые продукты
+    if (Array.isArray(dislikedProducts)) {
+      await client.query('DELETE FROM user_disliked_products WHERE user_id = $1', [req.user.id]);
+
+      for (const product of dislikedProducts) {
+        if (product && product.trim()) {
+          await client.query(
+            'INSERT INTO user_disliked_products (user_id, product_name) VALUES ($1, $2)',
+            [req.user.id, product.trim()],
+          );
+        }
+      }
+    }
+
+    // 4. Обновляем любимые продукты
+    if (Array.isArray(favoriteProductIds)) {
+      await client.query('DELETE FROM favorite_products WHERE user_id = $1', [req.user.id]);
+
+      for (const productId of favoriteProductIds) {
+        await client.query('INSERT INTO favorite_products (user_id, product_id) VALUES ($1, $2)', [
           req.user.id,
-          gender ?? null,
-          age ?? null,
-          height_cm ?? null,
-          weight_kg ?? null,
-          goal ?? null,
-          daily_calorie_norm ?? null,
-        ],
-      );
-    }
-
-    // 🔥 Возвращаем BMI в ответе
-    res.json({
-      message: 'Профиль обновлён',
-      bmi: bmi?.toFixed(1) ?? null,
-      daily_calorie_norm: daily_calorie_norm ?? null,
-    });
-  } catch (err) {
-    console.error('PUT /api/profile error:', err.message);
-    res.status(500).json({ error: 'Ошибка сохранения профиля' });
-  }
-});
-
-/**
- * @route GET /api/profile/bmi
- * @description Рассчитать ИМТ текущего пользователя
- * @access Private (требуется авторизация)
- */
-router.get('/bmi', authenticate, async (req, res) => {
-  try {
-    // Получаем профиль из БД
-    const profileResult = await pool.query(
-      'SELECT height_cm, weight_kg FROM profiles WHERE user_id = $1',
-      [req.user.id],
-    );
-
-    if (profileResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Профиль не найден',
-        details: ['Сначала создайте профиль с указанием роста и веса'],
-      });
-    }
-
-    const profile = profileResult.rows[0];
-
-    // Проверяем, есть ли данные
-    if (!profile.height_cm || !profile.weight_kg) {
-      return res.status(400).json({
-        success: false,
-        error: 'Недостаточно данных',
-        details: ['В профиле не указан рост или вес'],
-      });
-    }
-
-    // Рассчитываем ИМТ
-    const { calculateBMI } = require('../utils/bmiCalculator');
-    const bmiResult = calculateBMI(profile.weight_kg, profile.height_cm);
-
-    if (!bmiResult.success) {
-      return res.status(400).json(bmiResult);
-    }
-
-    res.json({
-      success: true,
-      message: 'ИМТ успешно рассчитан',
-      data: bmiResult.data,
-      meta: {
-        calculatedAt: new Date().toISOString(),
-      },
-    });
-  } catch (err) {
-    console.error('GET /api/profile/bmi error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при расчёте ИМТ',
-    });
-  }
-});
-
-/**
- * @route GET /api/profile/metrics
- * @description Получить все метрики профиля (ИМТ, рост, вес, возраст)
- * @access Private (требуется авторизация)
- */
-router.get('/metrics', authenticate, async (req, res) => {
-  try {
-    // Получаем полный профиль
-    const profileResult = await pool.query('SELECT * FROM profiles WHERE user_id = $1', [
-      req.user.id,
-    ]);
-
-    if (profileResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Профиль не найден',
-        details: ['Профиль ещё не создан'],
-      });
-    }
-
-    const profile = profileResult.rows[0];
-    const metrics = {
-      height_cm: profile.height_cm,
-      weight_kg: profile.weight_kg,
-      age: profile.age,
-      gender: profile.gender,
-      goal: profile.goal,
-      daily_calorie_norm: profile.daily_calorie_norm,
-    };
-
-    // Если есть рост и вес, добавляем ИМТ
-    if (profile.height_cm && profile.weight_kg) {
-      const { calculateBMI } = require('../utils/bmiCalculator');
-      const bmiResult = calculateBMI(profile.weight_kg, profile.height_cm);
-
-      if (bmiResult.success) {
-        metrics.bmi = bmiResult.data.bmi;
-        metrics.bmiCategory = bmiResult.data.category;
-        metrics.bmiCategoryCode = bmiResult.data.categoryCode;
-        metrics.healthyWeightRange = bmiResult.data.healthyWeightRange;
+          productId,
+        ]);
       }
     }
 
+    await client.query('COMMIT');
+
+    // ✅ ИСПРАВЛЕНО: добавлен ключ data: перед объектом
     res.json({
       success: true,
-      message: 'Метрики успешно получены',
-      data: metrics,
-    });
-  } catch (err) {
-    console.error('GET /api/profile/metrics error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при получении метрик',
-    });
-  }
-});
-
-/**
- * @route GET /api/profile/calories
- * @description Рассчитать норму калорий текущего пользователя
- * @access Private (требуется авторизация)
- * @query {number} activityLevel - коэффициент активности (1.2, 1.375, 1.55, 1.725, 1.9)
- */
-router.get('/calories', authenticate, async (req, res) => {
-  try {
-    // Получаем профиль из БД
-    const profileResult = await pool.query(
-      `SELECT gender, age, height_cm, weight_kg, goal, daily_calorie_norm 
-       FROM profiles 
-       WHERE user_id = $1`,
-      [req.user.id],
-    );
-
-    if (profileResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Профиль не найден',
-        details: ['Сначала создайте профиль'],
-      });
-    }
-
-    const profile = profileResult.rows[0];
-
-    // Проверяем обязательные поля
-    const requiredFields = ['gender', 'age', 'height_cm', 'weight_kg', 'goal'];
-    const missingFields = requiredFields.filter((field) => !profile[field]);
-
-    if (missingFields.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Недостаточно данных',
-        details: [`Заполните поля: ${missingFields.join(', ')}`],
-      });
-    }
-
-    // Получаем уровень активности из query params (по умолчанию 1.2)
-    const activityLevel = req.query.activityLevel ? parseFloat(req.query.activityLevel) : 1.2;
-
-    // Рассчитываем норму калорий
-    const { calculateCalorieNorm } = require('../utils/calorieCalculator');
-
-    const calorieResult = calculateCalorieNorm({
-      weightKg: profile.weight_kg,
-      heightCm: profile.height_cm,
-      age: profile.age,
-      gender: profile.gender,
-      goal: profile.goal,
-      activityLevel,
-    });
-
-    if (!calorieResult.success) {
-      return res.status(400).json(calorieResult);
-    }
-
-    // Добавляем рекомендации
-
-    // Добавляем сохранённое значение из БД для сравнения
-    calorieResult.data.storedNorm = profile.daily_calorie_norm
-      ? Number(profile.daily_calorie_norm)
-      : null;
-
-    res.json({
-      success: true,
-      message: 'Норма калорий успешно рассчитана',
-      data: calorieResult.data,
-      meta: {
-        calculatedAt: new Date().toISOString(),
-        activityLevelSource: req.query.activityLevel ? 'query_param' : 'default',
-      },
-    });
-  } catch (err) {
-    console.error('GET /api/profile/calories error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при расчёте нормы калорий',
-    });
-  }
-});
-
-/**
- * @route GET /api/profile/calories/breakdown
- * @description Получить детальную расшифровку расчёта калорий
- * @access Private
- */
-router.get('/calories/breakdown', authenticate, async (req, res) => {
-  try {
-    const profileResult = await pool.query(
-      `SELECT gender, age, height_cm, weight_kg, goal 
-       FROM profiles 
-       WHERE user_id = $1`,
-      [req.user.id],
-    );
-
-    if (profileResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Профиль не найден',
-      });
-    }
-
-    const profile = profileResult.rows[0];
-    const activityLevel = req.query.activityLevel ? parseFloat(req.query.activityLevel) : 1.2;
-
-    const { calculateCalorieNorm } = require('../utils/calorieCalculator');
-    const result = calculateCalorieNorm({
-      weightKg: profile.weight_kg,
-      heightCm: profile.height_cm,
-      age: profile.age,
-      gender: profile.gender,
-      goal: profile.goal,
-      activityLevel,
-    });
-
-    if (!result.success) {
-      return res.status(400).json(result);
-    }
-
-    res.json({
-      success: true,
-      message: 'Расшифровка расчёта',
+      message: 'Профиль успешно обновлён',
       data: {
-        userProfile: {
-          weight: profile.weight_kg,
-          height: profile.height_cm,
-          age: profile.age,
-          gender: profile.gender,
-          goal: profile.goal,
-        },
-        calculation: result.data.breakdown,
-        result: {
-          bmr: result.data.bmr,
-          tdee: result.data.tdee,
-          dailyNorm: result.data.dailyCalorieNorm,
-        },
-        explanation: {
-          bmr: 'BMR (Basal Metabolic Rate) — базовый обмен веществ: калории, необходимые для поддержания жизни в состоянии покоя',
-          tdee: 'TDEE (Total Daily Energy Expenditure) — общие суточные энергозатраты с учётом активности',
-          goal: `Цель "${profile.goal}" корректирует норму: ${result.data.goalMultiplier > 1 ? 'увеличение' : result.data.goalMultiplier < 1 ? 'снижение' : 'без изменений'}`,
-        },
+        daily_calorie_norm,
+        calculated: daily_calorie_norm !== null,
       },
     });
   } catch (err) {
-    console.error('GET /api/profile/calories/breakdown error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Ошибка при получении расшифровки',
-    });
+    await client.query('ROLLBACK');
+    console.error('PUT /api/profile error:', err);
+    res.status(500).json({ error: 'Ошибка сохранения профиля' });
+  } finally {
+    client.release();
   }
 });
+
+// ============================================================================
+// Вспомогательная функция: маппинг уровня активности
+// ============================================================================
+function getActivityLevelMultiplier(level) {
+  const map = {
+    minimal: 1.2, // Минимальная (сидячий образ жизни)
+    moderate: 1.55, // Умеренная (тренировки 3-5 раз/неделю)
+    high: 1.725, // Высокая (интенсивные тренировки 6-7 раз/неделю)
+  };
+  return map[level] || 1.2;
+}
 
 module.exports = router;
