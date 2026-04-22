@@ -1,5 +1,3 @@
-/* ProfilePage.css */
-
 .profile-container {
   position: relative;
   width: 1200px;
@@ -8,7 +6,6 @@
   font-family: 'Jost', sans-serif;
 }
 
-/* Верхняя панель */
 .top-nav {
   position: absolute;
   width: 1000px;
@@ -38,7 +35,6 @@
   border-radius: 50%;
 }
 
-/* Карточки */
 .metrics-card, .goal-card, .info-card, .allergies-card {
   background: #FFFFFF;
   border-radius: 15px;
@@ -74,7 +70,6 @@
   top: 486px;
 }
 
-/* Заголовки карточек */
 .metrics-card h3, .goal-card h3, .info-card h3, .allergies-card h3 {
   color: #58B079;
   font-size: 16px;
@@ -82,7 +77,6 @@
   margin-bottom: 15px;
 }
 
-/* Поля ввода */
 .metric-input {
   background: #F0F0F0;
   border-radius: 15px;
@@ -92,7 +86,6 @@
   font-family: 'Jost', sans-serif;
 }
 
-/* Переключатель пола */
 .gender-toggle {
   display: flex;
   gap: 10px;
@@ -136,7 +129,6 @@
   top: 0;
 }
 
-/* Кнопка сохранения */
 .save-btn {
   position: absolute;
   width: 170px;
@@ -159,7 +151,6 @@
   cursor: not-allowed;
 }
 
-/* Сообщение об ошибке */
 .error-toast {
   position: absolute;
   left: 50%;
@@ -180,13 +171,11 @@
   100% { opacity: 0; visibility: hidden; }
 }
 
-/* Звездочки обязательных полей */
 .required-star {
   color: #D974E6;
   margin-left: 5px;
 }
 
-/* Ошибки полей */
 .field-error {
   color: #C73434;
   font-size: 12px;

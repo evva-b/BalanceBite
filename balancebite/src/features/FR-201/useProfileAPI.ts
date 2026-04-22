@@ -1,36 +1,62 @@
 ﻿import { useState } from 'react';
 
 interface ProfileData {
-    gender: 'male' | 'female';
+    gender: 'M' | 'Ж';
     age: number;
     height_cm: number;
     weight_kg: number;
     goal: string;
+    activity_level?: 'minimal' | 'moderate' | 'high';
+    email?: string;
+    phone?: string;
+    status?: string;
+    dislikedProducts?: string[];
+    favoriteProductIds?: string[];
+}
+
+interface FavoriteProduct {
+    id: string;
+    name: string;
+    calories_kcal: number;
+    proteins_g: number;
+    fats_g: number;
+    carbs_g: number;
 }
 
 interface ProfileResponse {
-    id?: string;
-    user_id?: string;
-    gender: 'male' | 'female';
-    age: number;
-    height_cm: number;
-    weight_kg: number;
-    goal: string;
-    bmi?: number;
-    daily_calorie_norm?: number;
+    success: boolean;
+    data: {
+        email: string;
+        phone: string;
+        status: string;
+        gender: 'M' | 'Ж';
+        age: number;
+        height_cm: number;
+        weight_kg: number;
+        goal: string;
+        activity_level: 'minimal' | 'moderate' | 'high';
+        daily_calorie_norm: number;
+        bmi?: number;
+        bmiCategory?: string;
+        dislikedProducts: string[];
+        favoriteProducts: FavoriteProduct[];
+    };
 }
 
 interface SaveResult {
     success: boolean;
     errors?: Record<string, string>;
-    data?: ProfileResponse;
+    data?: {
+        daily_calorie_norm: number;
+        calculated: boolean;
+    };
 }
 
 export const useProfileAPI = () => {
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const loadProfile = async (): Promise<ProfileResponse | null> => {
+    const loadProfile = async (): Promise<ProfileResponse['data'] | null> => {
         try {
             const response = await fetch('http://localhost:3001/api/profile', {
                 credentials: 'include'
@@ -42,8 +68,8 @@ export const useProfileAPI = () => {
             }
 
             if (response.ok) {
-                const data: ProfileResponse = await response.json();
-                return data;
+                const result: ProfileResponse = await response.json();
+                return result.data;
             }
 
             if (response.status === 404) {
@@ -68,6 +94,11 @@ export const useProfileAPI = () => {
                 body: JSON.stringify(data)
             });
 
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return { success: false, errors: { general: 'Требуется авторизация' } };
+            }
+
             const result = await response.json();
 
             if (!response.ok && result.details) {
@@ -82,7 +113,13 @@ export const useProfileAPI = () => {
             }
 
             if (response.ok) {
-                return { success: true, data: result };
+                return {
+                    success: true,
+                    data: {
+                        daily_calorie_norm: result.data?.daily_calorie_norm || 0,
+                        calculated: result.data?.calculated || false
+                    }
+                };
             }
 
             return { success: false, errors: { general: 'Ошибка сохранения' } };
@@ -98,12 +135,10 @@ export const useProfileAPI = () => {
             const response = await fetch('http://localhost:3001/api/profile/metrics', {
                 credentials: 'include'
             });
-
             if (response.status === 401) {
                 window.location.href = '/login';
                 return null;
             }
-
             if (response.ok) {
                 return await response.json();
             }
@@ -119,12 +154,10 @@ export const useProfileAPI = () => {
             const response = await fetch('http://localhost:3001/api/profile/bmi', {
                 credentials: 'include'
             });
-
             if (response.status === 401) {
                 window.location.href = '/login';
                 return null;
             }
-
             if (response.ok) {
                 return await response.json();
             }
@@ -134,7 +167,6 @@ export const useProfileAPI = () => {
             return null;
         }
     };
-
 
     return { loadProfile, saveProfile, getMetrics, getBMI, loading, errors };
 };

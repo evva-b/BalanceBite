@@ -51,6 +51,24 @@ export const useCalorieAPI = () => {
         }
         return null;
     };
+    const getCaloriesBreakdown = async (activityLevel: string) => {
+        setLoading(true);
+        try {
+            const response = await fetch(
+                `http://localhost:3001/api/profile/calories/breakdown?activityLevel=${activityLevel}`,
+                { credentials: 'include' }
+            );
+            if (response.ok) {
+                return await response.json();
+            }
+            return null;
+        } catch (error) {
+            console.error('Ошибка получения расшифровки:', error);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    return { fetchCalories, calorieData, loading };
+    return { fetchCalories, calorieData, loading, getCaloriesBreakdown };
 };
