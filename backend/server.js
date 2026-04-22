@@ -30,4 +30,7 @@ app.use((error, req, res, next) => {
   return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
 
+const diaryRoutes = require('./routes/diary');
+app.use('/api/diary', diaryRoutes);
+
 app.listen(PORT, () => console.log(`🚀 Бэкенд запущен на http://localhost:${PORT}`));
