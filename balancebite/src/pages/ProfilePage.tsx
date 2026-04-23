@@ -6,12 +6,12 @@ import logo from '../assets/logo.svg';
 
 interface FormDataType {
     name: string;
-    gender: 'M' | 'Ж';
+    gender: string;
     age: string;
     height_cm: string;
     weight_kg: string;
-    goal: 'weight_loss' | 'maintenance' | 'weight_gain';
-    activityLevel: 'minimal' | 'moderate' | 'high';
+    goal: string;
+    activityLevel: string;
     email: string;
     phone: string;
     status: string;
@@ -34,7 +34,7 @@ interface ProductListType {
 export const ProfilePage: React.FC = () => {
     const [formData, setFormData] = useState<FormDataType>({
         name: '',
-        gender: 'M',
+        gender: 'male',
         age: '',
         height_cm: '',
         weight_kg: '',
@@ -57,15 +57,8 @@ export const ProfilePage: React.FC = () => {
     });
 
     const [products, setProducts] = useState<ProductListType>({
-        favorite: [
-            { id: '1', name: 'Курица', calories_kcal: 165, proteins_g: 31, fats_g: 3.6, carbs_g: 0 },
-            { id: '2', name: 'Авокадо', calories_kcal: 160, proteins_g: 2, fats_g: 15, carbs_g: 9 },
-            { id: '3', name: 'Гречка', calories_kcal: 343, proteins_g: 13, fats_g: 3.4, carbs_g: 72 },
-            { id: '4', name: 'Яйца', calories_kcal: 155, proteins_g: 13, fats_g: 11, carbs_g: 1.1 },
-            { id: '5', name: 'Бананы', calories_kcal: 89, proteins_g: 1.1, fats_g: 0.3, carbs_g: 23 },
-            { id: '6', name: 'Творог', calories_kcal: 98, proteins_g: 11, fats_g: 2.5, carbs_g: 3.3 }
-        ],
-        notFavorite: ['Рыба', 'Брокколи', 'Печень', 'Морепродукты', 'Тофу']
+        favorite: [],
+        notFavorite: []
     });
 
     const [isFavoriteOpen, setIsFavoriteOpen] = useState(true);
@@ -80,18 +73,20 @@ export const ProfilePage: React.FC = () => {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(true);
 
-    const activityLevelToValue = {
+    // Маппинг уровней активности для UI
+    const activityLevelToUI = {
         'minimal': '1.2',
         'moderate': '1.55',
-        'high': '1.9'
+        'high': '1.725'
     };
 
-    const valueToActivityLevel = {
+    const uiToActivityLevel = {
         '1.2': 'minimal',
         '1.55': 'moderate',
-        '1.9': 'high'
+        '1.725': 'high'
     };
 
+    // Маппинг целей для API
     const goalToAPI = {
         'weight_loss': 'Снижение веса',
         'maintenance': 'Поддержание веса',
@@ -104,13 +99,25 @@ export const ProfilePage: React.FC = () => {
         'Набор массы': 'weight_gain'
     };
 
+    // Маппинг пола для API
+    const genderToAPI = {
+        'male': 'M',
+        'female': 'Ж'
+    };
+
+    const apiToGender = {
+        'M': 'male',
+        'Ж': 'female'
+    };
+
+    // Загрузка профиля
     const loadProfileData = async () => {
         setIsLoadingData(true);
         const data = await loadProfile();
         if (data) {
             setFormData({
                 name: data.email?.split('@')[0] || '',
-                gender: data.gender === 'M' ? 'M' : 'Ж',
+                gender: apiToGender[data.gender] || 'male',
                 age: data.age?.toString() || '',
                 height_cm: data.height_cm?.toString() || '',
                 weight_kg: data.weight_kg?.toString() || '',
@@ -142,36 +149,22 @@ export const ProfilePage: React.FC = () => {
                     bmiCategory: data.bmiCategory || ''
                 }));
             }
-
-            if (data.height_cm && data.weight_kg && data.age) {
-                const activityValue = activityLevelToValue[data.activity_level || 'moderate'];
-                const calorieData = await fetchCalories(activityValue);
-                if (calorieData) {
-                    setMetrics(prev => ({
-                        ...prev,
-                        calories: calorieData.dailyCalorieNorm,
-                        bmr: calorieData.bmr.toString(),
-                        proteins: Math.round((calorieData.dailyCalorieNorm || 2000) * 0.3 / 4),
-                        fats: Math.round((calorieData.dailyCalorieNorm || 2000) * 0.25 / 9),
-                        carbs: Math.round((calorieData.dailyCalorieNorm || 2000) * 0.45 / 4)
-                    }));
-                }
-            }
         }
         setIsLoadingData(false);
     };
 
+    // Обновление калорий
     const updateCalories = async () => {
         if (!formData.height_cm || !formData.weight_kg || !formData.age) return;
 
-        const activityValue = activityLevelToValue[formData.activityLevel];
+        const activityValue = activityLevelToUI[formData.activityLevel];
         const calorieData = await fetchCalories(activityValue);
 
         if (calorieData) {
             setMetrics(prev => ({
                 ...prev,
                 calories: calorieData.dailyCalorieNorm,
-                bmr: calorieData.bmr.toString(),
+                bmr: calorieData.bmr?.toString() || '',
                 proteins: Math.round((calorieData.dailyCalorieNorm || 2000) * 0.3 / 4),
                 fats: Math.round((calorieData.dailyCalorieNorm || 2000) * 0.25 / 9),
                 carbs: Math.round((calorieData.dailyCalorieNorm || 2000) * 0.45 / 4)
@@ -179,6 +172,7 @@ export const ProfilePage: React.FC = () => {
         }
     };
 
+    // Сохранение профиля
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setShowError(false);
@@ -190,17 +184,17 @@ export const ProfilePage: React.FC = () => {
             .filter(id => id && !id.startsWith('temp'));
 
         const result = await saveProfile({
-            gender: formData.gender,
+            gender: genderToAPI[formData.gender as keyof typeof genderToAPI] || 'M',
             age: Number(formData.age),
             height_cm: Number(formData.height_cm),
             weight_kg: Number(formData.weight_kg),
-            goal: goalToAPI[formData.goal],
+            goal: goalToAPI[formData.goal as keyof typeof goalToAPI] || 'Поддержание веса',
             activity_level: formData.activityLevel,
             email: formData.email,
             phone: formData.phone,
             status: formData.status,
             dislikedProducts: products.notFavorite,
-            favoriteProductIds: realFavoriteProductIds  // 👈 Только реальные ID
+            favoriteProductIds: realFavoriteProductIds
         });
 
         if (result.success) {
@@ -213,45 +207,19 @@ export const ProfilePage: React.FC = () => {
         }
     };
 
+    // Добавление любимого продукта
     const addFavoriteProduct = () => {
         if (!newFavoriteProduct.trim()) return;
 
         const productName = newFavoriteProduct.trim();
 
-        // Примерная калорийность для популярных продуктов
-        const knownProducts: Record<string, { calories: number, proteins: number, fats: number, carbs: number }> = {
-            'авокадо': { calories: 160, proteins: 2, fats: 15, carbs: 9 },
-            'курица': { calories: 165, proteins: 31, fats: 3.6, carbs: 0 },
-            'куриная грудка': { calories: 165, proteins: 31, fats: 3.6, carbs: 0 },
-            'гречка': { calories: 343, proteins: 13, fats: 3.4, carbs: 72 },
-            'яйца': { calories: 155, proteins: 13, fats: 11, carbs: 1.1 },
-            'бананы': { calories: 89, proteins: 1.1, fats: 0.3, carbs: 23 },
-            'творог': { calories: 98, proteins: 11, fats: 2.5, carbs: 3.3 },
-            'лосось': { calories: 208, proteins: 20, fats: 13, carbs: 0 },
-            'рис': { calories: 130, proteins: 2.7, fats: 0.3, carbs: 28 },
-            'овсянка': { calories: 68, proteins: 2.4, fats: 1.4, carbs: 12 },
-            'миндаль': { calories: 579, proteins: 21, fats: 49, carbs: 22 },
-            'хлеб': { calories: 265, proteins: 9, fats: 3.2, carbs: 49 },
-            'макароны': { calories: 131, proteins: 5, fats: 1.1, carbs: 25 },
-            'картофель': { calories: 77, proteins: 2, fats: 0.1, carbs: 17 },
-            'помидоры': { calories: 18, proteins: 0.9, fats: 0.2, carbs: 3.9 },
-            'огурцы': { calories: 15, proteins: 0.7, fats: 0.1, carbs: 3.6 },
-            'сыр': { calories: 402, proteins: 25, fats: 33, carbs: 1.3 },
-            'молоко': { calories: 42, proteins: 3.4, fats: 1, carbs: 4.8 },
-            'йогурт': { calories: 59, proteins: 10, fats: 0.4, carbs: 3.6 },
-            'греческий йогурт': { calories: 59, proteins: 10, fats: 0.4, carbs: 3.6 }
-        };
-
-        const lowerName = productName.toLowerCase();
-        const known = knownProducts[lowerName];
-
         const tempProduct: FavoriteProduct = {
             id: `temp-${Date.now()}`,
             name: productName,
-            calories_kcal: known?.calories || 0,
-            proteins_g: known?.proteins || 0,
-            fats_g: known?.fats || 0,
-            carbs_g: known?.carbs || 0
+            calories_kcal: 0,
+            proteins_g: 0,
+            fats_g: 0,
+            carbs_g: 0
         };
 
         setProducts(prev => ({
@@ -261,6 +229,7 @@ export const ProfilePage: React.FC = () => {
         setNewFavoriteProduct('');
     };
 
+    // Добавление нелюбимого продукта
     const addNotFavoriteProduct = () => {
         if (newNotFavoriteProduct.trim()) {
             setProducts(prev => ({
@@ -271,6 +240,7 @@ export const ProfilePage: React.FC = () => {
         }
     };
 
+    // Удаление любимого продукта
     const removeFavoriteProduct = (productId: string) => {
         setProducts(prev => ({
             ...prev,
@@ -278,6 +248,7 @@ export const ProfilePage: React.FC = () => {
         }));
     };
 
+    // Удаление нелюбимого продукта
     const removeNotFavoriteProduct = (productToRemove: string) => {
         setProducts(prev => ({
             ...prev,
@@ -294,31 +265,26 @@ export const ProfilePage: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleGenderChange = (gender: 'M' | 'Ж') => {
+    const handleGenderChange = (gender: string) => {
         setFormData(prev => ({ ...prev, gender }));
     };
 
-    const handleGoalChange = (goal: 'weight_loss' | 'maintenance' | 'weight_gain') => {
+    const handleGoalChange = (goal: string) => {
         setFormData(prev => ({ ...prev, goal }));
-        setTimeout(() => updateCalories(), 0);
+        setTimeout(() => updateCalories(), 100);
     };
 
     const handleActivityLevelChange = (level: string) => {
-        const mappedLevel = valueToActivityLevel[level];
+        // level приходит как '1.2', '1.55' или '1.725'
+        const mappedLevel = uiToActivityLevel[level];
         if (mappedLevel) {
-            setFormData(prev => ({ ...prev, activityLevel: mappedLevel as 'minimal' | 'moderate' | 'high' }));
+            setFormData(prev => ({ ...prev, activityLevel: mappedLevel }));
             setTimeout(() => updateCalories(), 100);
         }
     };
 
     const handleNameChange = (name: string) => {
         setFormData(prev => ({ ...prev, name }));
-    };
-
-    const handleMetricChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        setTimeout(() => updateCalories(), 100);
     };
 
     if (isLoadingData) {
@@ -332,6 +298,7 @@ export const ProfilePage: React.FC = () => {
     return (
         <section className="w-full bg-[#FFFFE6] min-h-screen py-8 lg:py-12">
             <div className="max-w-6xl mx-auto px-6 lg:px-12">
+                {/* Верхняя панель навигации */}
                 <nav className="flex justify-between items-center mb-8">
                     <Link to="/" className="flex items-center gap-2">
                         <img src={logo} alt="BalanceBite Logo" className="w-60 h-11 object-contain" />
@@ -350,6 +317,7 @@ export const ProfilePage: React.FC = () => {
                     <div className="w-10 h-10 bg-[#58B079] rounded-full"></div>
                 </nav>
 
+                {/* Сообщение об успешном сохранении */}
                 {saveSuccess && (
                     <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fadeOut">
                         <div className="bg-green-500 text-white px-4 py-2 rounded-xl">
@@ -359,6 +327,7 @@ export const ProfilePage: React.FC = () => {
                 )}
 
                 <form onSubmit={handleSubmit}>
+                    {/* Верхний ряд: аватарка + имя + краткая информация */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <div className="flex items-center gap-6">
                             <div className="w-[150px] h-[150px] bg-[#58B079] rounded-full flex items-center justify-center text-white text-4xl flex-shrink-0">
@@ -378,6 +347,7 @@ export const ProfilePage: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Краткая информация */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm">
                             <h3 className="text-[#58B079] font-bold text-lg mb-4">Краткая информация</h3>
                             <div className="space-y-3">
@@ -418,12 +388,18 @@ export const ProfilePage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Блоки: мои показатели + цель питания */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <ProfileMetrics
                             metrics={metrics}
-                            formData={formData}
+                            formData={{
+                                age: formData.age,
+                                height_cm: formData.height_cm,
+                                weight_kg: formData.weight_kg,
+                                gender: formData.gender
+                            }}
                             errors={errors}
-                            onInputChange={handleMetricChange}
+                            onInputChange={handleInputChange}
                             onGenderChange={handleGenderChange}
                         />
 
@@ -431,12 +407,12 @@ export const ProfilePage: React.FC = () => {
                             <h3 className="text-[#58B079] font-bold text-lg mb-4 text-center">Цель питания</h3>
 
                             <GoalSelector
-                                selectedGoal={formData.goal}
+                                selectedGoal={formData.goal as 'weight_loss' | 'maintenance' | 'weight_gain'}
                                 onGoalChange={handleGoalChange}
                             />
 
                             <ActivityLevel
-                                selectedLevel={activityLevelToValue[formData.activityLevel]}  // 'minimal' -> '1.2'
+                                selectedLevel={activityLevelToUI[formData.activityLevel]}
                                 onLevelChange={handleActivityLevelChange}
                             />
 
@@ -449,12 +425,14 @@ export const ProfilePage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Любимые и НЕлюбимые продукты */}
                     <div className="mb-8">
                         <div className="bg-white rounded-2xl p-6 shadow-sm">
                             <h3 className="text-[#58B079] font-bold text-lg mb-4 text-center">
                                 Любимые и нелюбимые продукты
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Любимые продукты */}
                                 <div>
                                     <button
                                         type="button"
@@ -472,9 +450,11 @@ export const ProfilePage: React.FC = () => {
                                                 {products.favorite.map((product) => (
                                                     <div key={product.id} className="flex items-center gap-1 bg-[#F0F0F0] rounded-full px-3 py-1">
                                                         <span className="text-[#22241E] text-sm">{product.name}</span>
-                                                        <span className="text-[#58B079] text-xs ml-1">
-                                                            ({product.calories_kcal} ккал)
-                                                        </span>
+                                                        {product.calories_kcal > 0 && (
+                                                            <span className="text-[#58B079] text-xs ml-1">
+                                                                ({product.calories_kcal} ккал)
+                                                            </span>
+                                                        )}
                                                         <button
                                                             type="button"
                                                             onClick={() => removeFavoriteProduct(product.id)}
@@ -491,7 +471,7 @@ export const ProfilePage: React.FC = () => {
                                                     value={newFavoriteProduct}
                                                     onChange={(e) => setNewFavoriteProduct(e.target.value)}
                                                     className="px-3 py-1 bg-[#F0F0F0] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#58B079]"
-                                                    placeholder="Например: Лосось, Киноа, Миндаль..."
+                                                    placeholder="Например: Курица, Авокадо, Гречка..."
                                                 />
                                                 <button
                                                     type="button"
@@ -505,6 +485,7 @@ export const ProfilePage: React.FC = () => {
                                     )}
                                 </div>
 
+                                {/* НЕлюбимые продукты */}
                                 <div>
                                     <button
                                         type="button"
@@ -538,7 +519,7 @@ export const ProfilePage: React.FC = () => {
                                                     value={newNotFavoriteProduct}
                                                     onChange={(e) => setNewNotFavoriteProduct(e.target.value)}
                                                     className="px-3 py-1 bg-[#F0F0F0] rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-[#58B079]"
-                                                    placeholder="Например: Шпинат, Оливки, Тыква..."
+                                                    placeholder="Например: Рыба, Брокколи, Печень..."
                                                 />
                                                 <button
                                                     type="button"
@@ -555,6 +536,7 @@ export const ProfilePage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Кнопка сохранения */}
                     <div className="flex justify-center">
                         <button
                             type="submit"
