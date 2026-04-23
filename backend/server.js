@@ -30,4 +30,10 @@ app.use((error, req, res, next) => {
   return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
 });
 
+const diaryRoutes = require('./routes/diary');
+app.use('/api/diary', diaryRoutes);
+
+const analyticsRoutes = require('./routes/analytics');
+app.use('/api/analytics', analyticsRoutes);
+
 app.listen(PORT, () => console.log(`🚀 Бэкенд запущен на http://localhost:${PORT}`));
