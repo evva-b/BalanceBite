@@ -3,6 +3,148 @@ const pool = require('../db');
 const authenticate = require('../middlewares/authenticate');
 const router = express.Router();
 
+router.post('/nutrition', authenticate, async (req, res) => {
+    try {
+        const { date, proteins_g, fats_g, carbs_g, calories_kcal, meal_name } = req.body;
+
+        if (!date) {
+            return res.status(400).json({ error: 'Дата обязательна' });
+        }
+
+        // Проверяем формат даты
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(date)) {
+            return res.status(400).json({ error: 'Неверный формат даты. Используйте YYYY-MM-DD' });
+        }
+
+        // Начинаем транзакцию
+        await pool.query('BEGIN');
+
+        // Проверяем, есть ли уже прием пищи за этот день
+        let mealResult = await pool.query(
+            `SELECT id FROM meals 
+       WHERE user_id = $1 AND date = $2 AND meal_name = $3`,
+            [req.user.id, date, meal_name || 'Основной прием']
+        );
+
+        let mealId;
+        if (mealResult.rows.length === 0) {
+            // Создаем новый прием пищи
+            const newMeal = await pool.query(
+                `INSERT INTO meals (user_id, date, meal_name) 
+         VALUES ($1, $2, $3) RETURNING id`,
+                [req.user.id, date, meal_name || 'Основной прием']
+            );
+            mealId = newMeal.rows[0].id;
+        } else {
+            mealId = mealResult.rows[0].id;
+        }
+
+        // Добавляем запись о питании (можно создать "виртуальный" продукт или записать напрямую)
+        const entryResult = await pool.query(
+            `INSERT INTO meal_entries 
+       (meal_id, product_id, quantity_g, calories_kcal, proteins_g, fats_g, carbs_g)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6)
+       RETURNING id`,
+            [mealId, 100, calories_kcal || 0, proteins_g || 0, fats_g || 0, carbs_g || 0]
+        );
+
+        await pool.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Данные о питании сохранены',
+            data: {
+                date,
+                proteins_g: proteins_g || 0,
+                fats_g: fats_g || 0,
+                carbs_g: carbs_g || 0,
+                calories_kcal: calories_kcal || 0
+            }
+        });
+
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error('POST /api/analytics/nutrition error:', err);
+        res.status(500).json({ error: 'Ошибка сохранения данных о питании' });
+    }
+});
+
+router.post('/meal', authenticate, async (req, res) => {
+    try {
+        const { date, meal_name, products } = req.body;
+
+        if (!date) {
+            return res.status(400).json({ error: 'Дата обязательна' });
+        }
+
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            return res.status(400).json({ error: 'Необходимо указать список продуктов' });
+        }
+
+        await pool.query('BEGIN');
+
+        // Создаем прием пищи
+        const mealResult = await pool.query(
+            `INSERT INTO meals (user_id, date, meal_name) 
+       VALUES ($1, $2, $3) RETURNING id`,
+            [req.user.id, date, meal_name || 'Прием пищи']
+        );
+        const mealId = mealResult.rows[0].id;
+
+        // Добавляем каждый продукт
+        for (const product of products) {
+            let productId = product.product_id;
+
+            // Если продукта нет в БД, создаем временный
+            if (!productId && product.name) {
+                const existingProduct = await pool.query(
+                    `SELECT id FROM products WHERE LOWER(name) = LOWER($1) LIMIT 1`,
+                    [product.name]
+                );
+
+                if (existingProduct.rows.length > 0) {
+                    productId = existingProduct.rows[0].id;
+                } else {
+                    const newProduct = await pool.query(
+                        `INSERT INTO products (name, calories_kcal, proteins_g, fats_g, carbs_g, is_custom, user_id)
+             VALUES ($1, $2, $3, $4, $5, true, $6) RETURNING id`,
+                        [product.name, product.calories || 0, product.proteins || 0, product.fats || 0, product.carbs || 0, req.user.id]
+                    );
+                    productId = newProduct.rows[0].id;
+                }
+            }
+
+            await pool.query(
+                `INSERT INTO meal_entries (meal_id, product_id, quantity_g, calories_kcal, proteins_g, fats_g, carbs_g)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [
+                    mealId,
+                    productId,
+                    product.quantity_g || 100,
+                    product.calories || 0,
+                    product.proteins || 0,
+                    product.fats || 0,
+                    product.carbs || 0
+                ]
+            );
+        }
+
+        await pool.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Прием пищи сохранен',
+            data: { mealId, date, meal_name }
+        });
+
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error('POST /api/analytics/meal error:', err);
+        res.status(500).json({ error: 'Ошибка сохранения приема пищи' });
+    }
+});
+
 // ============================================================================
 // FR-401: История взвешиваний за период
 // ============================================================================
