@@ -23,15 +23,14 @@ export function LoginPage() {
             return;
         }
 
-        setIsSubmitting(true);
-        try {
-            await login({ email, password, rememberMe });
-            navigate('/profile');
-        } catch (requestError) {
-            setError(requestError instanceof Error ? requestError.message : 'Ошибка входа');
-        } finally {
-            setIsSubmitting(false);
-        }
+    setIsSubmitting(true);
+    try {
+      await login({ email, password, rememberMe });
+      navigate('/diary');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Ошибка входа');
+    } finally {
+      setIsSubmitting(false);
     }
 
     return (

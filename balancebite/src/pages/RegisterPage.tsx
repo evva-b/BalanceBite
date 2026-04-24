@@ -33,15 +33,14 @@ export function RegisterPage() {
             return;
         }
 
-        setIsSubmitting(true);
-        try {
-            await register({ email, password });
-            navigate('/profile');
-        } catch (requestError) {
-            setError(requestError instanceof Error ? requestError.message : 'Ошибка регистрации');
-        } finally {
-            setIsSubmitting(false);
-        }
+    setIsSubmitting(true);
+    try {
+      await register({ email, password });
+      navigate('/diary');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Ошибка регистрации');
+    } finally {
+      setIsSubmitting(false);
     }
 
     return (

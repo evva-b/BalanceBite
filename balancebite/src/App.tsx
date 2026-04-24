@@ -5,8 +5,19 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import './index.css';
+import { DiaryPage } from './pages/DiaryPage';
 
 function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/diary" element={<DiaryPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
     return (
         <BrowserRouter>
             <Routes>
