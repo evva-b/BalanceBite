@@ -293,7 +293,7 @@ export const DiaryPage: React.FC = () => {
               База продуктов
             </a>
           </div>
-          <div className="w-[37px] h-[37px] bg-[#58B079] rounded-full"></div>
+          <a href="/profile" className="w-[37px] h-[37px] bg-[#58B079] rounded-full"></a>
         </nav>
 
         <div className="flex gap-8">
