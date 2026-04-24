@@ -37,7 +37,7 @@ export function RegisterPage() {
     setIsSubmitting(true);
     try {
       await register({ email, password });
-      navigate('/');
+      navigate('/diary');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Ошибка регистрации');
     } finally {

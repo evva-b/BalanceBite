@@ -27,7 +27,7 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       await login({ email, password, rememberMe });
-      navigate('/');
+      navigate('/diary');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Ошибка входа');
     } finally {
